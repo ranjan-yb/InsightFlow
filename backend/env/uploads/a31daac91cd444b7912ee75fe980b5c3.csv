@@ -1,0 +1,31 @@
+name,email,phone,city,state,signup_date,plan
+Alice Whitfield,alice.whitfield@example.com,512-555-0142,Austin,TX,2023-01-15,Pro
+Ben Gallagher,ben.gallagher@example.com,718-555-0198,Brooklyn,NY,2023-02-03,Free
+Clara Dominguez,clara.dominguez@example.com,312-555-0267,Chicago,IL,2023-02-28,Starter
+Derek Yoon,derek.yoon@example.com,415-555-0331,San Francisco,CA,2023-03-12,Enterprise
+Emily Sato,emily.sato@example.com,206-555-0174,Seattle,WA,2023-03-30,Pro
+Frank Mueller,frank.mueller@example.com,303-555-0285,Denver,CO,2023-04-18,Free
+Grace Okonkwo,grace.okonkwo@example.com,404-555-0316,Atlanta,GA,2023-05-09,Starter
+Henry Tran,henry.tran@example.com,213-555-0423,Los Angeles,CA,2023-05-22,Pro
+Irene Kowalczyk,irene.kowalczyk@example.com,617-555-0187,Boston,MA,2023-06-14,Enterprise
+James Carpenter,james.carpenter@example.com,503-555-0294,Portland,OR,2023-07-01,Free
+Karen Liu,karen.liu@example.com,512-555-0358,Austin,TX,2023-07-19,Pro
+Leo Vasquez,leo.vasquez@example.com,305-555-0146,Miami,FL,2023-08-05,Starter
+Monica Andersen,monica.andersen@example.com,612-555-0273,Minneapolis,MN,2023-08-20,Free
+Nathan Reeves,nathan.reeves@example.com,919-555-0412,Raleigh,NC,2023-09-03,Pro
+Olivia Brennan,olivia.brennan@example.com,602-555-0189,Phoenix,AZ,2023-09-18,Enterprise
+Patrick Simmons,patrick.simmons@example.com,469-555-0327,Dallas,TX,2023-10-02,Starter
+Quinn Nakamura,quinn.nakamura@example.com,808-555-0265,Honolulu,HI,2023-10-15,Free
+Rachel Greene,rachel.greene@example.com,615-555-0198,Nashville,TN,2023-11-01,Pro
+Sam Abadi,sam.abadi@example.com,202-555-0347,Washington,DC,2023-11-19,Enterprise
+Tina Hoffman,tina.hoffman@example.com,704-555-0156,Charlotte,NC,2023-12-05,Starter
+Ulysses Grant,ulysses.grant@example.com,314-555-0283,St. Louis,MO,2024-01-08,Free
+Vera Stanton,vera.stanton@example.com,415-555-0174,San Francisco,CA,2024-01-22,Pro
+Walter Kim,walter.kim@example.com,312-555-0418,Chicago,IL,2024-02-14,Free
+Xena Petrov,xena.petrov@example.com,206-555-0329,Seattle,WA,2024-03-01,Starter
+Yusuf Ali,yusuf.ali@example.com,718-555-0267,Brooklyn,NY,2024-03-18,Pro
+Zoe McCarthy,zoe.mccarthy@example.com,503-555-0145,Portland,OR,2024-04-05,Enterprise
+Amanda Torres,amanda.torres@example.com,404-555-0298,Atlanta,GA,2024-04-22,Free
+Blake Henderson,blake.henderson@example.com,617-555-0356,Boston,MA,2024-05-10,Starter
+Cassandra Wolfe,cassandra.wolfe@example.com,213-555-0187,Los Angeles,CA,2024-06-01,Pro
+Diego Ruiz,diego.ruiz@example.com,305-555-0423,Miami,FL,2024-06-19,Enterprise

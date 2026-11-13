@@ -1,0 +1,7 @@
+id,name,age ,salary,city
+1,Rahul,25,30000,Ranchi
+2,Amit,30,45000,Patna
+3,John,,50000,Delhi
+4,Rahul,25,30000,Ranchi
+5,Neha,28,,Ranchi
+6,Ravi,60,200000,Patna
