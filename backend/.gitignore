@@ -1,0 +1,37 @@
+
+# Python virtual environments
+env/
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Testing and linting
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Uploaded CSV files
+uploads/*
+!uploads/.gitkeep
+
+# Generated reports
+reports/*
+!reports/.gitkeep
+
+# Temporary files
+*.log
+*.tmp
+
+# IDE
+.idea/
+.vscode/

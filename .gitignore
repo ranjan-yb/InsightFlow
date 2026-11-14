@@ -1,36 +1,32 @@
 
-# Environment variables
+# Environment variables and secrets
 .env
 .env.*
 !.env.example
 
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-venv/
-.venv/
-env/
 .pytest_cache/
 .ruff_cache/
+.coverage
 
-# Node
-node_modules/
-dist/
-.vite/
-
-# Backend generated files
-backend/__pycache__/
-backend/.pytest_cache/
-backend/.ruff_cache/
+# Python virtual environments
+venv/
+env/
+.venv/
+backend/env/
 backend/venv/
 backend/.venv/
 
-# Environment variables
-.env
-.env.*
-!.env.example
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+frontend/dist/
+backend/dist/
 
 # Uploaded files and generated reports
 backend/uploads/*
@@ -38,37 +34,14 @@ backend/reports/*
 !backend/uploads/.gitkeep
 !backend/reports/.gitkeep
 
-# IDE and OS files
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
 # Logs
 *.log
+npm-debug.log*
 
-# Temporary files
-*.tmp
-*.bak
+# IDE
+.vscode/
+.idea/
 
-# Python virtual environment
-backend/env/
-backend/venv/
-backend/.venv/
-
-# Python cache
-__pycache__/
-*.py[cod]
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
-# Uploaded files and generated reports
-backend/uploads/*
-backend/reports/*
-
-# Frontend
-node_modules/
-dist/
+# Operating system
+.DS_Store
+Thumbs.db
