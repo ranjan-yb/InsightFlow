@@ -81,7 +81,7 @@ def get_dataset_overview(object_key: str) -> dict:
     }
 
 
-def calculate_kpi(file_path: Path, column: str, operation: str):
+def calculate_kpi(file_path: read_csv_content, column: str, operation: str):
 
     df = read_dataset(file_path)
 
@@ -133,7 +133,7 @@ def calculate_kpi(file_path: Path, column: str, operation: str):
     }
 
 def group_by_analysis(
-    file_path: Path,
+    file_path: read_csv_content,
     group_by: str,
     metric: str,
     operation: str,
@@ -189,7 +189,7 @@ def group_by_analysis(
 
 
 def filter_dataset(
-    file_path: Path,
+    file_path: read_csv_content,
     filters: list,
     limit: int = 100
 ):
@@ -265,7 +265,7 @@ def filter_dataset(
 
 
 def generate_chart(
-    file_path: Path,
+    file_path: read_csv_content,
     chart_type: str,
     group_by: str,
     metric: str,
@@ -307,7 +307,7 @@ def generate_chart(
     }
 
 
-def get_dashboard_summary(file_path: Path) -> dict:
+def get_dashboard_summary(file_path: read_csv_content) -> dict:
 
     overview = get_dataset_overview(file_path)
 
