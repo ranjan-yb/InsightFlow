@@ -1,11 +1,16 @@
+from pathlib import Path
+from io import BytesIO
+from app.services.storage_service import download_bytes
 
 import math
-from pathlib import Path
+
 
 import pandas as pd
 from fastapi import HTTPException
 
 from app.models.dataset import Dataset
+
+from app.services.csv_service import read_dataset
 
 
 def safe_value(value):
@@ -25,33 +30,13 @@ def safe_value(value):
     return str(value)
 
 
-def read_dataset(file_path: Path) -> pd.DataFrame:
-    """Read CSV with UTF-8 first and CP1252 as a fallback."""
-    try:
-        return pd.read_csv(
-            file_path,
-            encoding="utf-8-sig",
-            low_memory=False
-        )
-    except UnicodeDecodeError:
-        return pd.read_csv(
-            file_path,
-            encoding="cp1252",
-            low_memory=False
-        )
-
 
 def profile_dataset(dataset: Dataset):
-    file_path = Path(dataset.file_path)
-
-    if not file_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset file not found"
-        )
 
     try:
-        df = read_dataset(file_path)
+
+        # Automatically reads from local storage or R2
+        df = read_dataset(dataset.file_path)
 
         total_rows, total_columns = df.shape
 

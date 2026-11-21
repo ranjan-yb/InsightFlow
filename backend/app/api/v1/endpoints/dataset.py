@@ -70,6 +70,11 @@ from app.services.analytics_service import get_dashboard_summary
 from fastapi.responses import FileResponse
 from app.services.export_service import export_excel, export_pdf
 
+from fastapi.responses import Response
+
+from app.services.storage_service import download_bytes
+from app.services.storage_service import delete_file
+
 router = APIRouter(
     prefix="/datasets",
     tags=["Datasets"]
@@ -181,6 +186,7 @@ def get_dataset_quality(
     "/{dataset_id}/clean",
     response_model=CleaningResponse
 )
+
 def clean_dataset_endpoint(
     dataset_id: int,
     config: CleaningRequest,
@@ -203,26 +209,28 @@ def clean_dataset_endpoint(
             detail="Dataset not found"
         )
 
-    # 2. Run the cleaning engine
+    # 2. Run cleaning engine and upload cleaned CSV to R2
     result = clean_dataset(dataset, config)
 
-    cleaned_path = Path(result["cleaned_file_path"])
+    # Keep the R2 object key as a string
+    cleaned_object_key = result["cleaned_file_path"]
 
     try:
-        # 3. Save cleaning report
+        # 3. Update dataset with R2 object key
+        dataset.cleaned_file_path = cleaned_object_key
+        dataset.status = "cleaned"
+
+        # 4. Save cleaning report
         cleaning_report = CleaningReport(
             dataset_id=dataset.id,
-            cleaned_file_path=str(cleaned_path),
+            cleaned_file_path=cleaned_object_key,
             configuration=config.model_dump(),
             report=result["report"]
         )
 
         db.add(cleaning_report)
 
-        # 4. Update the latest cleaned file path
-        dataset.cleaned_file_path = str(cleaned_path)
-        dataset.status = "cleaned"
-
+        # 5. Commit database changes
         db.commit()
         db.refresh(cleaning_report)
 
@@ -230,7 +238,7 @@ def clean_dataset_endpoint(
             "report_id": cleaning_report.id,
             "dataset_id": dataset.id,
             "filename": dataset.original_filename,
-            "cleaned_filename": cleaned_path.name,
+            "cleaned_filename": cleaned_object_key.split("/")[-1],
             "cleaning_report": result["report"],
             "created_at": cleaning_report.created_at
         }
@@ -238,8 +246,11 @@ def clean_dataset_endpoint(
     except Exception:
         db.rollback()
 
-        if cleaned_path.exists():
-            cleaned_path.unlink()
+        # Remove uploaded R2 object if database transaction fails
+        try:
+            delete_file(cleaned_object_key)
+        except Exception:
+            pass
 
         raise HTTPException(
             status_code=500,
@@ -248,12 +259,18 @@ def clean_dataset_endpoint(
 
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 @router.get("/{dataset_id}/download")
 def download_cleaned_dataset(
     dataset_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 1. Verify dataset ownership
     dataset = (
         db.query(Dataset)
         .filter(
@@ -269,26 +286,47 @@ def download_cleaned_dataset(
             detail="Dataset not found"
         )
 
+    # 2. Check cleaned dataset availability
     if not dataset.cleaned_file_path:
         raise HTTPException(
             status_code=404,
             detail="No cleaned dataset available"
         )
 
-    file_path = Path(dataset.cleaned_file_path)
-
-    if not file_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="Cleaned CSV file not found"
+    try:
+        # 3. Download cleaned CSV from R2
+        file_content = download_bytes(
+            dataset.cleaned_file_path
         )
 
-    return FileResponse(
-        path=file_path,
-        media_type="text/csv",
-        filename=f"cleaned_{dataset.original_filename}"
+        # 4. Return CSV as downloadable response
+        filename = f"cleaned_{dataset.original_filename}"
+
+        return Response(
+            content=file_content,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{filename}"'
+                )
+            }
+        )
+
+    # except Exception:
+    #     raise HTTPException(
+    #         status_code=500,
+    #         detail="Unable to download cleaned dataset"
+    #     )
+    except Exception as exc:
+        logger.exception(
+            "Failed to download cleaned dataset. Dataset ID: %s",
+            dataset_id
     )
 
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc)
+        )
 
 
 @router.get(
@@ -361,13 +399,9 @@ def get_analytics_overview(
             detail="Dataset not found"
         )
 
-    file_path = Path(dataset.cleaned_file_path or dataset.file_path)
-
-    if not file_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset file not found"
-        )
+    file_path = (
+        dataset.cleaned_file_path or dataset.file_path
+    )
 
     result = get_dataset_overview(file_path)
 
@@ -400,10 +434,9 @@ def get_dataset_kpi(
     if not dataset:
         raise HTTPException(404, detail="Dataset not found")
 
-    file_path = Path(dataset.cleaned_file_path or dataset.file_path)
+    file_path = dataset.cleaned_file_path or dataset.file_path
 
-    if not file_path.is_file():
-        raise HTTPException(404, detail="Dataset file not found")
+
 
     try:
         result = calculate_kpi(
@@ -438,10 +471,10 @@ def get_group_by_analysis(
     if not dataset:
         raise HTTPException(404, detail="Dataset not found")
 
-    file_path = Path(dataset.cleaned_file_path or dataset.file_path)
+    file_path = dataset.cleaned_file_path or dataset.file_path
 
-    if not file_path.is_file():
-        raise HTTPException(404, detail="Dataset file not found")
+    # if not file_path.is_file():
+    #     raise HTTPException(404, detail="Dataset file not found")
 
     try:
         return group_by_analysis(
@@ -478,10 +511,9 @@ def filter_dataset_endpoint(
     if not dataset:
         raise HTTPException(404, detail="Dataset not found")
 
-    file_path = Path(dataset.cleaned_file_path or dataset.file_path)
+    file_path = dataset.cleaned_file_path or dataset.file_path
 
-    if not file_path.is_file():
-        raise HTTPException(404, detail="Dataset file not found")
+    
 
     try:
         filters = [
@@ -519,10 +551,9 @@ def get_dataset_chart(
     if not dataset:
         raise HTTPException(404, detail="Dataset not found")
 
-    file_path = Path(dataset.cleaned_file_path or dataset.file_path)
+    file_path = dataset.cleaned_file_path or dataset.file_path
 
-    if not file_path.is_file():
-        raise HTTPException(404, detail="Dataset file not found")
+
 
     try:
         return generate_chart(
@@ -560,15 +591,10 @@ def get_analytics_dashboard(
             detail="Dataset not found"
         )
 
-    file_path = Path(
+    # Keep the R2 object key as a string
+    file_path = (
         dataset.cleaned_file_path or dataset.file_path
     )
-
-    if not file_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset file not found"
-        )
 
     try:
         result = get_dashboard_summary(file_path)

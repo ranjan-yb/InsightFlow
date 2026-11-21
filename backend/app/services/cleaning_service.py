@@ -1,31 +1,21 @@
+from io import BytesIO
+from app.services.storage_service import (
+    download_bytes,
+    upload_bytes,
+    delete_file
+)
 
-from pathlib import Path
 from uuid import uuid4
 import re
 
 import pandas as pd
 from fastapi import HTTPException
 
-from app.core.config import settings
 from app.models.dataset import Dataset
 from app.schemas.cleaning import CleaningRequest
 
+from app.services.csv_service import read_csv_content, read_dataset
 
-def read_csv_file(file_path: Path) -> pd.DataFrame:
-    """Read CSV with encoding fallback."""
-
-    try:
-        return pd.read_csv(
-            file_path,
-            encoding="utf-8-sig",
-            low_memory=False
-        )
-    except UnicodeDecodeError:
-        return pd.read_csv(
-            file_path,
-            encoding="cp1252",
-            low_memory=False
-        )
 
 
 def normalize_column_name(name: str) -> str:
@@ -252,20 +242,19 @@ def clean_dataset(
     dataset: Dataset,
     config: CleaningRequest
 ):
-    """Apply user-selected cleaning operations."""
+    """Clean a dataset stored in Cloudflare R2."""
 
-    original_path = Path(dataset.file_path)
-
-    if not original_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="Original dataset file not found"
-        )
-
-    cleaned_path = None
+    cleaned_object_key = None
+    uploaded_to_r2 = False
 
     try:
-        df = read_csv_file(original_path)
+
+        print("DATABASE CLEANED OBJECT KEY:", repr(dataset.cleaned_file_path))
+        # 1. Download original CSV from R2
+        original_content = download_bytes(dataset.file_path)
+
+        # 2. Read CSV from memory
+        df = read_csv_content(original_content)
 
         original_rows = len(df)
         original_columns = len(df.columns)
@@ -277,70 +266,104 @@ def clean_dataset(
             "original_missing_values": original_missing
         }
 
-        # 1. Normalize column names
+        # 3. Normalize column names
         if config.normalize_column_names:
             df = normalize_columns(df)
 
-        # 2. Handle missing values
+        # 4. Handle missing values
         df = handle_missing_values(
             df,
             config,
             report
         )
 
-        # 3. Handle duplicates
+        # 5. Handle duplicates
         df = remove_duplicates(
             df,
             config,
             report
         )
 
-        # 4. Handle outliers
+        # 6. Handle outliers
         df = handle_outliers(
             df,
             config,
             report
         )
 
-        # 5. Generate cleaned CSV
-        output_dir = Path(settings.UPLOAD_DIR) / "cleaned"
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # 7. Generate cleaned CSV in memory
+        cleaned_content = df.to_csv(
+            index=False
+        ).encode("utf-8-sig")
 
         cleaned_filename = f"{uuid4().hex}_cleaned.csv"
-        cleaned_path = output_dir / cleaned_filename
 
-        df.to_csv(
-            cleaned_path,
-            index=False,
-            encoding="utf-8-sig"
+        # Store cleaned files separately from original files
+        cleaned_object_key = (
+            f"users/{dataset.user_id}/datasets/cleaned/"
+            f"{cleaned_filename}"
         )
 
+        print("R2 CLEANED OBJECT KEY:", repr(cleaned_object_key))
+
+
+        # 8. Upload cleaned CSV to R2
+        upload_bytes(
+            content=cleaned_content,
+            object_key=cleaned_object_key,
+            content_type="text/csv"
+        )
+
+        uploaded_to_r2 = True
+
+        # 9. Update cleaning report
         report.update({
             "cleaned_rows": len(df),
             "cleaned_columns": len(df.columns),
-            "remaining_missing_values": int(df.isna().sum().sum()),
+            "remaining_missing_values": int(
+                df.isna().sum().sum()
+            ),
             "rows_removed": original_rows - len(df),
             "columns_normalized": config.normalize_column_names
         })
 
         return {
-            "cleaned_file_path": str(cleaned_path),
+            "cleaned_file_path": cleaned_object_key,
             "report": report
         }
 
     except HTTPException:
-        if cleaned_path and cleaned_path.exists():
-            cleaned_path.unlink()
+        if uploaded_to_r2 and cleaned_object_key:
+            try:
+                delete_file(cleaned_object_key)
+            except Exception:
+                pass
+
         raise
 
-    except (pd.errors.ParserError, pd.errors.EmptyDataError,
-            UnicodeDecodeError):
+    except (
+        pd.errors.ParserError,
+        pd.errors.EmptyDataError,
+        UnicodeDecodeError
+    ):
+        if uploaded_to_r2 and cleaned_object_key:
+            try:
+                delete_file(cleaned_object_key)
+            except Exception:
+                pass
+
         raise HTTPException(
             status_code=400,
             detail="Unable to process CSV file"
         )
 
     except Exception:
-        if cleaned_path and cleaned_path.exists():
-            cleaned_path.unlink()
+        if uploaded_to_r2 and cleaned_object_key:
+            try:
+                delete_file(cleaned_object_key)
+            except Exception:
+                pass
+
         raise
+
+

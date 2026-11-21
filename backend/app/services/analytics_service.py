@@ -1,15 +1,45 @@
-from pathlib import Path
+from io import BytesIO
 import pandas as pd
+from app.services.storage_service import download_bytes
+from app.services.csv_service import read_csv_content, read_dataset
 
-from app.services.quality_service import read_dataset
+def read_dataset_from_r2(object_key: str) -> pd.DataFrame:
+    """Read a CSV dataset directly from Cloudflare R2."""
+
+    if not object_key:
+        raise ValueError("Dataset object key is missing")
+
+    # Download CSV bytes from R2
+    file_content = download_bytes(object_key)
+
+    # Try UTF-8 encoding first
+    try:
+        return pd.read_csv(
+            BytesIO(file_content),
+            encoding="utf-8-sig",
+            low_memory=False
+        )
+
+    except UnicodeDecodeError:
+        # Fallback to CP1252
+        return pd.read_csv(
+            BytesIO(file_content),
+            encoding="cp1252",
+            low_memory=False
+        )
 
 
-def get_dataset_overview(file_path: Path) -> dict:
-    df = read_dataset(file_path)
+def get_dataset_overview(object_key: str) -> dict:
 
-    numeric_columns = df.select_dtypes(include="number").columns.tolist()
+    df = read_dataset_from_r2(object_key)
 
-    datetime_columns = df.select_dtypes(include="datetime").columns.tolist()
+    numeric_columns = df.select_dtypes(
+        include="number"
+    ).columns.tolist()
+
+    datetime_columns = df.select_dtypes(
+        include="datetime"
+    ).columns.tolist()
 
     categorical_columns = [
         column

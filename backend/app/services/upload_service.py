@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,9 +7,16 @@ import pandas as pd
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.models.dataset import Dataset
 from app.models.user import User
+from app.services.storage_service import (
+    upload_bytes,
+    delete_file
+)
+
+from app.services.csv_service import read_csv_content
+
+
 
 
 async def upload_dataset(
@@ -17,43 +25,28 @@ async def upload_dataset(
     current_user: User,
     db: Session
 ):
-
-    upload_dir = Path(settings.UPLOAD_DIR)
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    # Generate unique filename
+    # Generate a unique R2 object key
     stored_filename = f"{uuid4().hex}.csv"
 
-    file_path = upload_dir / stored_filename
+    object_key = (
+        f"users/{current_user.id}/datasets/{stored_filename}"
+    )
+
+    uploaded_to_r2 = False
 
     try:
+        # Read uploaded file into memory
+        content = await file.read()
 
-        # Save uploaded file
-        with open(file_path, "wb") as buffer:
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV file contains no data"
+            )
 
-            while True:
-
-                chunk = await file.read(1024 * 1024)
-
-                if not chunk:
-                    break
-
-                buffer.write(chunk)
-
-        # Read CSV using Pandas
+        # Validate CSV before uploading it
         try:
-            df = pd.read_csv(
-                file_path,
-                encoding="utf-8-sig",
-                low_memory=False
-            )
-
-        except UnicodeDecodeError:
-            df = pd.read_csv(
-                file_path,
-                encoding="cp1252",
-                low_memory=False
-            )
+            df = read_csv_content(content)
 
         except pd.errors.EmptyDataError:
             raise HTTPException(
@@ -65,6 +58,12 @@ async def upload_dataset(
             raise HTTPException(
                 status_code=400,
                 detail="Invalid CSV structure"
+            )
+
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported CSV encoding"
             )
 
         if len(df.columns) == 0:
@@ -79,11 +78,24 @@ async def upload_dataset(
                 detail="CSV contains too many columns"
             )
 
-        # Create database record
+
+
+        # Upload original CSV to Cloudflare R2
+        upload_bytes(
+            content=content,
+            object_key=object_key,
+            content_type="text/csv"
+        )
+
+        uploaded_to_r2 = True
+
+        # Save metadata in PostgreSQL
         dataset = Dataset(
-            original_filename=Path(file.filename or "dataset.csv").name,
+            original_filename=Path(
+                file.filename or "dataset.csv"
+            ).name,
             stored_filename=stored_filename,
-            file_path=str(file_path),
+            file_path=object_key,
             file_size=file_size,
             total_rows=len(df),
             total_columns=len(df.columns),
@@ -98,11 +110,14 @@ async def upload_dataset(
         return dataset
 
     except Exception:
-
         db.rollback()
 
-        if file_path.exists():
-            file_path.unlink()
+        # Remove R2 object if database operation fails
+        if uploaded_to_r2:
+            try:
+                delete_file(object_key)
+            except Exception:
+                pass
 
         raise
 

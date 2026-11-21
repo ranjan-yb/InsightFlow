@@ -1,20 +1,20 @@
-from fastapi import FastAPI
 
-from app.core.config import settings
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.v1.router import api_router
 
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title=settings.APP_NAME,
     debug=settings.DEBUG
 )
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,8 +35,8 @@ def home():
     }
 
 
-# @app.get("/health")
-# def health_check():
-#     return {
-#         "status": "healthy"
-#     }
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy"
+    }

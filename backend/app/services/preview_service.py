@@ -1,40 +1,39 @@
-
 import json
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 from fastapi import HTTPException
 
 from app.models.dataset import Dataset
+from app.services.quality_service import read_dataset
+from app.services.storage_service import file_exists
 
 
 def get_dataset_preview(dataset: Dataset, limit: int = 10):
-    file_path = Path(dataset.file_path)
 
-    if not file_path.is_file():
+    file_path = dataset.file_path
+
+    # Check local storage first, then R2
+    local_path = Path(file_path)
+
+    if not local_path.is_file() and not file_exists(file_path):
         raise HTTPException(
             status_code=404,
             detail="Dataset file not found"
         )
 
     try:
-        # First try UTF-8, then fall back to CP1252
-        try:
-            df = pd.read_csv(
-                file_path,
-                encoding="utf-8-sig",
-                nrows=limit,
-                low_memory=False
-            )
-        except UnicodeDecodeError:
-            df = pd.read_csv(
-                file_path,
-                encoding="cp1252",
-                nrows=limit,
-                low_memory=False
-            )
+        # Read only the requested number of rows
+        df = read_dataset(
+            file_path,
+            nrows=limit
+        )
 
         preview = json.loads(
-            df.to_json(orient="records", date_format="iso")
+            df.to_json(
+                orient="records",
+                date_format="iso"
+            )
         )
 
         columns = [
@@ -53,6 +52,9 @@ def get_dataset_preview(dataset: Dataset, limit: int = 10):
             "columns": columns,
             "preview": preview
         }
+
+    except HTTPException:
+        raise
 
     except pd.errors.EmptyDataError:
         raise HTTPException(
